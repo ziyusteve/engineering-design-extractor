@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+
+{% block title %}Job Status - Engineering Design Criteria Extractor{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <!-- Job Header -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h3 class="card-title mb-2">
+                            <i class="fas fa-file-pdf me-2"></i>
+                            {{ job.filename }}
+                        </h3>
+                        <p class="text-muted mb-0">
+                            Job ID: <code>{{ job.id[:8] }}</code> | 
+                            Created: {{ job.created_at.strftime('%Y-%m-%d %H:%M:%S') }}
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <span class="status-badge badge bg-{{ 'success' if job.status == 'completed' else 'warning' if job.status == 'processing' else 'danger' if job.status == 'failed' else 'secondary' }}">
+                            <i class="fas fa-{{ 'check' if job.status == 'completed' else 'spinner fa-spin' if job.status == 'processing' else 'times' if job.status == 'failed' else 'clock' }} me-1"></i>
+                            {{ job.status.title() }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Processing Status -->
+        {% if job.status == 'pending' or job.status == 'processing' %}
+        <div class="card mb-4">
+            <div class="card-body text-center">
+                <div class="loading-spinner mb-3" style="width: 40px; height: 40px; margin: 0 auto;"></div>
+                <h4>Processing Document...</h4>
+                <p class="text-muted">This may take a few minutes depending on the document size and complexity.</p>
+                <div class="progress" style="height: 10px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Error Message -->
+        {% if job.status == 'failed' and job.error_message %}
+        <div class="card mb-4 border-danger">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Processing Failed
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-danger mb-0">{{ job.error_message }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Results -->
+        {% if job.status == 'completed' and job.result and job.result.design_criteria %}
+        <div class="row">
+            <!-- Summary Metrics -->
+            <div class="col-12 mb-4">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">{{ job.result.design_criteria.loads|length }}</div>
+                            <div class="metric-label">Loads Extracted</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">{{ job.result.design_criteria.seismic_forces|length }}</div>
+                            <div class="metric-label">Seismic Forces</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">{{ job.result.design_criteria.tables|length }}</div>
+                            <div class="metric-label">Tables Found</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <div class="metric-value">{{ "%.1f"|format(job.result.design_criteria.confidence_score * 100) }}%</div>
+                            <div class="metric-label">Confidence</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loads -->
+            {% if job.result.design_criteria.loads %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-weight-hanging me-2"></i>
+                            Loads ({{ job.result.design_criteria.loads|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for load in job.result.design_criteria.loads[:3] %}
+                        <div class="mb-3 p-3 border rounded">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <div>
+                                    <strong>{{ load.load_type.value.replace('_', ' ').title() }}</strong>
+                                    {% if load.magnitude > 0 %}
+                                    <br><small class="text-muted">{{ load.magnitude }} {{ load.unit }}</small>
+                                    {% endif %}
+                                </div>
+                                <span class="badge bg-{{ 'success' if load.confidence > 0.8 else 'warning' if load.confidence > 0.6 else 'danger' }}">
+                                    {{ "%.1f"|format(load.confidence * 100) }}%
+                                </span>
+                            </div>
+                            {% if load.description %}
+                            <div class="mt-2">
+                                <strong>Extracted Text:</strong>
+                                <pre class="mt-1 mb-0" style="font-size: 0.85em; white-space: pre-wrap; background-color: #f8f9fa; padding: 0.5rem; border-radius: 0.25rem;">{{ load.description }}</pre>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                        {% if job.result.design_criteria.loads|length > 5 %}
+                        <p class="text-muted small">Showing first 5 of {{ job.result.design_criteria.loads|length }} loads</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Seismic Forces -->
+            {% if job.result.design_criteria.seismic_forces %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-wave-square me-2"></i>
+                            Seismic Forces ({{ job.result.design_criteria.seismic_forces|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for seismic in job.result.design_criteria.seismic_forces[:3] %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>{{ seismic.description[:50] }}{% if seismic.description|length > 50 %}...{% endif %}</strong>
+                                    {% if seismic.acceleration_coefficient %}
+                                    <br><small class="text-muted">Acceleration: {{ seismic.acceleration_coefficient }}</small>
+                                    {% endif %}
+                                </div>
+                                <span class="badge bg-{{ 'success' if seismic.confidence > 0.8 else 'warning' if seismic.confidence > 0.6 else 'danger' }}">
+                                    {{ "%.1f"|format(seismic.confidence * 100) }}%
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if job.result.design_criteria.seismic_forces|length > 3 %}
+                        <p class="text-muted small">Showing first 3 of {{ job.result.design_criteria.seismic_forces|length }} seismic forces</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Tables -->
+            {% if job.result.design_criteria.tables %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-table me-2"></i>
+                            Tables ({{ job.result.design_criteria.tables|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for table in job.result.design_criteria.tables[:3] %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <strong>Table on page {{ table.page_number }}</strong>
+                                    <br><small class="text-muted">{{ table.rows|length }} rows, {{ table.headers|length }} columns</small>
+                                </div>
+                                <span class="badge bg-{{ 'success' if table.confidence > 0.8 else 'warning' if table.confidence > 0.6 else 'danger' }}">
+                                    {{ "%.1f"|format(table.confidence * 100) }}%
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if job.result.design_criteria.tables|length > 3 %}
+                        <p class="text-muted small">Showing first 3 of {{ job.result.design_criteria.tables|length }} tables</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Design Vehicles -->
+            {% if job.result.design_criteria.design_vehicles %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-truck me-2"></i>
+                            Design Vehicles ({{ job.result.design_criteria.design_vehicles|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for vehicle in job.result.design_criteria.design_vehicles[:3] %}
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>{{ vehicle.vehicle_type.value.replace('_', ' ').title() }}</strong>
+                                    {% if vehicle.total_weight %}
+                                    <br><small class="text-muted">Weight: {{ vehicle.total_weight }} {{ vehicle.unit }}</small>
+                                    {% endif %}
+                                </div>
+                                <span class="badge bg-{{ 'success' if vehicle.confidence > 0.8 else 'warning' if vehicle.confidence > 0.6 else 'danger' }}">
+                                    {{ "%.1f"|format(vehicle.confidence * 100) }}%
+                                </span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        {% if job.result.design_criteria.design_vehicles|length > 3 %}
+                        <p class="text-muted small">Showing first 3 of {{ job.result.design_criteria.design_vehicles|length }} vehicles</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Extracted Images -->
+            {% if job.result.design_criteria.images %}
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-image me-2"></i>
+                            Extracted Images ({{ job.result.design_criteria.images|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for image in job.result.design_criteria.images[:6] %}
+                            <div class="col-md-4 mb-3">
+                                <div class="card">
+                                    {% if image.file_path %}
+                                    <img src="{{ url_for('serve_image', filename=image.file_path.replace('data/extracted_images/', '')) }}" 
+                                         class="card-img-top" alt="Extracted Image" 
+                                         style="max-height: 200px; object-fit: contain;">
+                                    {% else %}
+                                    <div class="card-img-top bg-light d-flex align-items-center justify-content-center" 
+                                         style="height: 200px;">
+                                        <i class="fas fa-image fa-3x text-muted"></i>
+                                    </div>
+                                    {% endif %}
+                                    <div class="card-body">
+                                        <h6 class="card-title">Page {{ image.page_number }}</h6>
+                                        <p class="card-text">
+                                            <small class="text-muted">
+                                                Confidence: {{ "%.1f"|format(image.confidence * 100) }}%
+                                            </small>
+                                        </p>
+                                        {% if image.file_path %}
+                                        <a href="{{ url_for('serve_image', filename=image.file_path.replace('data/extracted_images/', '')) }}" 
+                                           class="btn btn-sm btn-outline-primary" target="_blank">
+                                            <i class="fas fa-external-link-alt me-1"></i>View Full Size
+                                        </a>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% if job.result.design_criteria.images|length > 6 %}
+                        <p class="text-muted small text-center">Showing first 6 of {{ job.result.design_criteria.images|length }} images</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Structural Elements -->
+            {% if job.result.design_criteria.structural_elements %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0">
+                            <i class="fas fa-building me-2"></i>
+                            Structural Elements
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for element in job.result.design_criteria.structural_elements %}
+                        <div class="mb-3 p-3 border rounded">
+                            <h6 class="mb-2">{{ element.type|title }}</h6>
+                            <p class="mb-2">{{ element.text }}</p>
+                            <small class="text-muted">
+                                Confidence: {{ "%.1f"|format(element.confidence * 100) }}% | 
+                                Page: {{ element.page_number }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Material Specifications -->
+            {% if job.result.design_criteria.material_specifications %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cubes me-2"></i>
+                            Material Specifications
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for material in job.result.design_criteria.material_specifications %}
+                        <div class="mb-3 p-3 border rounded">
+                            <h6 class="mb-2">{{ material.type|title }}</h6>
+                            <p class="mb-2">{{ material.text }}</p>
+                            <small class="text-muted">
+                                Confidence: {{ "%.1f"|format(material.confidence * 100) }}% | 
+                                Page: {{ material.page_number }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Safety Factors -->
+            {% if job.result.design_criteria.safety_factors %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-shield-alt me-2"></i>
+                            Safety Factors
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for safety in job.result.design_criteria.safety_factors %}
+                        <div class="mb-3 p-3 border rounded">
+                            <h6 class="mb-2">{{ safety.type|title }}</h6>
+                            <p class="mb-2">{{ safety.text }}</p>
+                            <small class="text-muted">
+                                Confidence: {{ "%.1f"|format(safety.confidence * 100) }}% | 
+                                Page: {{ safety.page_number }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Environmental Conditions -->
+            {% if job.result.design_criteria.environmental_conditions %}
+            <div class="col-md-6 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-leaf me-2"></i>
+                            Environmental Conditions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for condition in job.result.design_criteria.environmental_conditions %}
+                        <div class="mb-3 p-3 border rounded">
+                            <h6 class="mb-2">{{ condition.type|title }}</h6>
+                            <p class="mb-2">{{ condition.text }}</p>
+                            <small class="text-muted">
+                                Confidence: {{ "%.1f"|format(condition.confidence * 100) }}% | 
+                                Page: {{ condition.page_number }}
+                            </small>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Document AI Entities -->
+            {% if job.result.design_criteria.document_ai_entities %}
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-robot me-2"></i>
+                            Document AI Entities ({{ job.result.design_criteria.document_ai_entities|length }})
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% for entity in job.result.design_criteria.document_ai_entities %}
+                        <div class="mb-4 p-3 border rounded">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="mb-2">
+                                        <span class="badge bg-primary me-2">{{ entity.type }}</span>
+                                        Confidence: {{ "%.1f"|format(entity.confidence * 100) }}%
+                                    </h6>
+                                    <p class="mb-2" style="font-family: monospace; white-space: pre-wrap;">{{ entity.text }}</p>
+                                    {% if entity.bounding_box %}
+                                    <small class="text-muted">
+                                        Bounding Box: ({{ "%.0f"|format(entity.bounding_box.x) }}, {{ "%.0f"|format(entity.bounding_box.y) }}, 
+                                        {{ "%.0f"|format(entity.bounding_box.width) }}, {{ "%.0f"|format(entity.bounding_box.height) }})
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4">
+                                    <!-- Entity Image -->
+                                    {% set entity_image_found = false %}
+                                    {% for image in job.result.design_criteria.images %}
+                                        {% if image.image_type and image.image_type.startswith('entity_') and entity.type.lower() in image.image_type %}
+                                            <div class="text-center">
+                                                <img src="{{ url_for('serve_image', job_id=job.job_id, filename=image.file_path) }}" 
+                                                     class="img-fluid rounded border" 
+                                                     style="max-height: 150px; max-width: 100%;"
+                                                     alt="{{ entity.type }} entity image">
+                                                <small class="text-muted d-block mt-1">{{ entity.type }} Entity Image</small>
+                                            </div>
+                                            {% set entity_image_found = true %}
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if not entity_image_found %}
+                                        <div class="text-center">
+                                            <div class="bg-light border rounded p-3" style="height: 150px; display: flex; align-items: center; justify-content: center;">
+                                                <small class="text-muted">No image available</small>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Raw Extracted Text -->
+            {% if job.result.design_criteria.raw_text %}
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-file-text me-2"></i>
+                            Raw Extracted Text
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <pre style="font-size: 0.85em; white-space: pre-wrap; background-color: #f8f9fa; padding: 1rem; border-radius: 0.25rem; max-height: 400px; overflow-y: auto;">{{ job.result.design_criteria.raw_text }}</pre>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Actions -->
+        <div class="card">
+            <div class="card-body text-center">
+                <a href="{{ url_for('download_results', job_id=job.id) }}" class="btn btn-primary me-3">
+                    <i class="fas fa-download me-2"></i>
+                    Download Results (JSON)
+                </a>
+                <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                    <i class="fas fa-upload me-2"></i>
+                    Process Another Document
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Back to Jobs -->
+        <div class="text-center mt-4">
+            <a href="{{ url_for('job_list') }}" class="btn btn-outline-primary">
+                <i class="fas fa-list me-2"></i>
+                View All Jobs
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if job.status == 'pending' or job.status == 'processing' %}
+<script>
+// Auto-refresh for processing jobs
+function checkJobStatus() {
+    fetch('/api/job/{{ job.id }}')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'completed' || data.status === 'failed') {
+                location.reload();
+            }
+        })
+        .catch(error => console.error('Error checking job status:', error));
+}
+
+// Check status every 5 seconds
+setInterval(checkJobStatus, 5000);
+</script>
+{% endif %}
+{% endblock %} 
