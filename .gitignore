@@ -53,15 +53,8 @@ Thumbs.db
 *.log
 logs/
 
-# Data files (ignore all files under data, but keep directory structure)
+# Data files (ignore all files under data)
 data/*
-!data/.gitkeep
-data/uploads/*
-data/output/*
-data/extracted_images/*
-!data/uploads/.gitkeep
-!data/output/.gitkeep
-!data/extracted_images/.gitkeep
 
 # Temporary files
 *.tmp
