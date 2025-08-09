@@ -10,6 +10,15 @@ from pathlib import Path
 # Add the src directory to the Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Load environment variables from a .env file if present (helps packaged apps)
+try:
+    from dotenv import load_dotenv
+    # Load .env from current working directory or alongside the executable
+    load_dotenv()
+except Exception:
+    # dotenv is optional at runtime; ignore if unavailable
+    pass
+
 from src.webapp.app import create_app
 
 if __name__ == "__main__":
