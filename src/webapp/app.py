@@ -3,6 +3,7 @@ Flask web application for engineering design criteria extraction.
 """
 
 import os
+import sys
 import uuid
 import json
 from datetime import datetime
@@ -18,6 +19,22 @@ from ..models.schemas import ExtractionResult
 from ..models.document_models import ProcessingStatus
 
 
+def _get_base_dir() -> str:
+    """Return a stable base directory both in dev and PyInstaller-frozen builds.
+
+    When packaged with PyInstaller, resources live under sys._MEIPASS and the
+    executable's directory should be the base for writable folders like data/.
+    In development, we use the project root (two levels up from this file).
+    """
+    # Prefer the directory of the executable when frozen, so data is created
+    # next to the .exe on Windows.
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        return os.path.dirname(sys.executable)
+
+    # Not frozen: resolve project root from source layout
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
 def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
@@ -26,11 +43,11 @@ def create_app():
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
     
-    # Use absolute paths to avoid issues with relative paths when running from different directories
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    app.config['UPLOAD_FOLDER'] = os.path.join(project_root, 'data/uploads')
-    app.config['OUTPUT_FOLDER'] = os.path.join(project_root, 'data/output')
-    app.config['EXTRACTED_IMAGES_FOLDER'] = os.path.join(project_root, 'data/extracted_images')
+    # Use absolute paths relative to a stable base directory (handles PyInstaller)
+    project_root = _get_base_dir()
+    app.config['UPLOAD_FOLDER'] = os.path.join(project_root, 'data', 'uploads')
+    app.config['OUTPUT_FOLDER'] = os.path.join(project_root, 'data', 'output')
+    app.config['EXTRACTED_IMAGES_FOLDER'] = os.path.join(project_root, 'data', 'extracted_images')
     app.config['ALLOWED_EXTENSIONS'] = {'pdf'}
     
     # Create directories
@@ -47,18 +64,40 @@ def create_app():
                filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
     
     def get_extractor():
-        """Get or create the engineering criteria extractor."""
+        """Get or create the engineering criteria extractor.
+
+        Resolves `GOOGLE_APPLICATION_CREDENTIALS` to an absolute path so the
+        packaged executable can find a credentials file placed next to it.
+        """
         project_id = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
         processor_id = os.getenv("DOCUMENT_AI_PROCESSOR_ID")
         location = os.getenv("DOCUMENT_AI_LOCATION", "us")
-        
+
+        # Resolve service account key path if provided and relative
+        credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if credentials_path:
+            if not os.path.isabs(credentials_path):
+                candidate = os.path.join(_get_base_dir(), credentials_path)
+                if os.path.exists(candidate):
+                    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = candidate
+                else:
+                    # Also try just the filename next to the executable
+                    alt_candidate = os.path.join(_get_base_dir(), os.path.basename(credentials_path))
+                    if os.path.exists(alt_candidate):
+                        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = alt_candidate
+                    else:
+                        raise FileNotFoundError(f"File {credentials_path} was not found. Place it next to the executable or set GOOGLE_APPLICATION_CREDENTIALS to an absolute path.")
+            else:
+                if not os.path.exists(credentials_path):
+                    raise FileNotFoundError(f"File {credentials_path} was not found. Place it next to the executable or set GOOGLE_APPLICATION_CREDENTIALS to an existing absolute path.")
+
         if not project_id or not processor_id:
             raise ValueError("Google Cloud configuration not found. Please set GOOGLE_CLOUD_PROJECT_ID and DOCUMENT_AI_PROCESSOR_ID environment variables.")
-        
+
         return EngineeringCriteriaExtractor(
             project_id=project_id,
             processor_id=processor_id,
-            location=location
+            location=location,
         )
     
     def process_document_async(job_id, file_path):
