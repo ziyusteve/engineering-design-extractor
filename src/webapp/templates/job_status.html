@@ -61,35 +61,7 @@
         <!-- Results -->
         {% if job.status == 'completed' and job.result and job.result.design_criteria %}
         <div class="row">
-            <!-- Summary Metrics -->
-            <div class="col-12 mb-4">
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value">{{ job.result.design_criteria.loads|length }}</div>
-                            <div class="metric-label">Loads Extracted</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value">{{ job.result.design_criteria.seismic_forces|length }}</div>
-                            <div class="metric-label">Seismic Forces</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value">{{ job.result.design_criteria.tables|length }}</div>
-                            <div class="metric-label">Tables Found</div>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="metric-card">
-                            <div class="metric-value">{{ "%.1f"|format(job.result.design_criteria.confidence_score * 100) }}%</div>
-                            <div class="metric-label">Confidence</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
 
             <!-- Loads -->
             {% if job.result.design_criteria.loads %}
