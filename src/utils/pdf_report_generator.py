@@ -117,7 +117,10 @@ class EngineeringPDFReportGenerator:
             
             story = []
             
-            # Add Document AI entities section only (no title, metadata, or summary)
+            # Add document metadata section
+            self._add_metadata_section(story, design_criteria)
+            
+            # Add Document AI entities section
             self._add_entities_section(story, design_criteria, image_base_path, job_id)
             
             # Build PDF
