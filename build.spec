@@ -8,12 +8,17 @@ from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 project_root = os.path.abspath(os.getcwd())
 src_dir = os.path.join(project_root, "src")
 
-# Bundle Jinja2 templates
+# Bundle Jinja2 templates and utils
 templates_dir = os.path.join(src_dir, "webapp", "templates")
+utils_dir = os.path.join(src_dir, "utils")
 datas = []
 if os.path.isdir(templates_dir):
     # Place inside the bundle under the same package path
     datas.append((templates_dir, "src/webapp/templates"))
+
+# Include utils module
+if os.path.isdir(utils_dir):
+    datas.append((utils_dir, "src/utils"))
 
 # Hidden imports for Google Cloud client libraries and friends
 hiddenimports = []
@@ -31,9 +36,15 @@ hiddenimports += collect_submodules("markupsafe")
 hiddenimports += collect_submodules("itsdangerous")
 hiddenimports += collect_submodules("click")
 
+# Add PDF generation dependencies
+hiddenimports += collect_submodules("reportlab")
+hiddenimports += collect_submodules("PIL")
+hiddenimports += ["src.utils.pdf_report_generator"]
+
 # Some packages require data files at runtime (templates, metadata)
 datas += collect_data_files("jinja2")
 datas += collect_data_files("flask")
+datas += collect_data_files("reportlab")
 
 # dotenv is optional at runtime; include if available so .env can be loaded
 try:
