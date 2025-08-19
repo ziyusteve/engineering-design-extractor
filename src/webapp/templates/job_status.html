@@ -240,7 +240,7 @@
                                     {% for image in job.result.design_criteria.images %}
                                         {% if image.image_type and image.image_type.startswith('entity_') and entity.type.lower() in image.image_type %}
                                             <div class="text-center">
-                                                <img src="{{ url_for('serve_image', job_id=job.job_id, filename=image.file_path) }}" 
+                                                <img src="{{ url_for('serve_image', filename=image.file_path) }}" 
                                                      class="img-fluid rounded border" 
                                                      style="max-height: 150px; max-width: 100%;"
                                                      alt="{{ entity.type }} entity image">
