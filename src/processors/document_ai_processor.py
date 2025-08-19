@@ -524,7 +524,7 @@ class DocumentAIProcessor:
             seismic_forces=seismic_forces,
             design_vehicles=design_vehicles,
             design_cranes=design_cranes,
-            tables=tables,
+            tables=[],  # Empty tables list - table extraction removed
             images=images,
             # New specific field types
             berthing_loads=berthing_loads,
