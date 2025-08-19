@@ -338,49 +338,6 @@ def create_app():
             logger.error(f"Error generating PDF report: {str(e)}")
             return jsonify({'error': 'Internal server error'}), 500
     
-    @app.route('/preview_pdf/<job_id>')
-    def preview_pdf_report(job_id):
-        """
-        Generate PDF report and return it for preview (not download).
-        
-        Args:
-            job_id: Job identifier
-            
-        Returns:
-            PDF file for preview
-        """
-        try:
-            # Find the job
-            job = None
-            for j in jobs.values():
-                if j['id'] == job_id:
-                    job = j
-                    break
-            
-            if not job or not job.get('result') or not job['result'].design_criteria:
-                return jsonify({'error': 'Job not found or no results available'}), 404
-            
-            # Import PDF generator
-            from ..utils.pdf_report_generator import generate_pdf_report_for_job
-            
-            # Generate PDF report for preview
-            pdf_path = generate_pdf_report_for_job(
-                job_id=job_id,
-                design_criteria=job['result'].design_criteria.dict(),
-                output_dir=app.config['OUTPUT_FOLDER'],
-                image_base_path=app.config['EXTRACTED_IMAGES_FOLDER']
-            )
-            
-            if pdf_path and os.path.exists(pdf_path):
-                # Return PDF for preview (inline display, not download)
-                return send_file(pdf_path, as_attachment=False, mimetype='application/pdf')
-            else:
-                return jsonify({'error': 'Failed to generate PDF report'}), 500
-                
-        except Exception as e:
-            logger.error(f"Error generating PDF preview: {str(e)}")
-            return jsonify({'error': 'Internal server error'}), 500
-    
     @app.route('/images/<path:filename>')
     def serve_image(filename):
         """

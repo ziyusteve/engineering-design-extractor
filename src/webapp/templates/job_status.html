@@ -450,10 +450,6 @@
                     <i class="fas fa-download me-2"></i>
                     Download Results (JSON)
                 </a>
-                <button type="button" class="btn btn-info me-3" data-bs-toggle="modal" data-bs-target="#pdfPreviewModal" onclick="loadPdfPreview('{{ job.id }}')">
-                    <i class="fas fa-eye me-2"></i>
-                    Preview PDF Report
-                </button>
                 <a href="{{ url_for('download_pdf_report', job_id=job.id) }}" class="btn btn-success me-3">
                     <i class="fas fa-file-pdf me-2"></i>
                     Download PDF Report
@@ -475,52 +471,11 @@
         </div>
     </div>
 </div>
-
-<!-- PDF Preview Modal -->
-<div class="modal fade" id="pdfPreviewModal" tabindex="-1" aria-labelledby="pdfPreviewModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="pdfPreviewModalLabel">
-                    <i class="fas fa-file-pdf me-2"></i>
-                    PDF Report Preview
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-0">
-                <div id="pdfPreviewLoading" class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <p class="mt-3 text-muted">Generating PDF preview...</p>
-                </div>
-                <div id="pdfPreviewError" class="alert alert-danger m-3" style="display: none;">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    Failed to load PDF preview. Please try downloading the PDF instead.
-                </div>
-                <iframe id="pdfPreviewFrame" 
-                        style="width: 100%; height: 70vh; border: none; display: none;"
-                        title="PDF Preview">
-                </iframe>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times me-2"></i>
-                    Close
-                </button>
-                <a id="downloadPdfFromPreview" href="#" class="btn btn-success">
-                    <i class="fas fa-download me-2"></i>
-                    Download PDF
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
-<script>
 {% if job.status == 'pending' or job.status == 'processing' %}
+<script>
 // Auto-refresh for processing jobs
 function checkJobStatus() {
     fetch('/api/job/{{ job.id }}')
@@ -535,42 +490,6 @@ function checkJobStatus() {
 
 // Check status every 5 seconds
 setInterval(checkJobStatus, 5000);
-{% endif %}
-
-// PDF Preview functionality
-function loadPdfPreview(jobId) {
-    const loadingDiv = document.getElementById('pdfPreviewLoading');
-    const errorDiv = document.getElementById('pdfPreviewError');
-    const iframe = document.getElementById('pdfPreviewFrame');
-    const downloadLink = document.getElementById('downloadPdfFromPreview');
-    
-    // Reset modal state
-    loadingDiv.style.display = 'block';
-    errorDiv.style.display = 'none';
-    iframe.style.display = 'none';
-    
-    // Set download link
-    downloadLink.href = `/download_pdf/${jobId}`;
-    
-    // Load PDF in iframe
-    const previewUrl = `/preview_pdf/${jobId}`;
-    
-    // Show loading state
-    iframe.onload = function() {
-        loadingDiv.style.display = 'none';
-        iframe.style.display = 'block';
-    };
-    
-    iframe.onerror = function() {
-        loadingDiv.style.display = 'none';
-        errorDiv.style.display = 'block';
-    };
-    
-    // Set iframe source to trigger loading
-    setTimeout(() => {
-        iframe.src = previewUrl;
-    }, 100);
-}
 
 // Handle collapse arrow rotation
 document.addEventListener('DOMContentLoaded', function() {
@@ -604,9 +523,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-{% endblock %}
+{% endif %}
 
-{% block extra_css %}
 <style>
 .btn-link:focus {
     box-shadow: none;
@@ -617,30 +535,6 @@ document.addEventListener('DOMContentLoaded', function() {
 .collapse-button:hover {
     background-color: rgba(255, 255, 255, 0.1) !important;
 }
-
-/* PDF Preview Modal Styles */
-.modal-xl {
-    max-width: 90vw;
-}
-
-#pdfPreviewFrame {
-    border-radius: 8px;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.modal-body {
-    background-color: #f8f9fa;
-}
-
-#pdfPreviewLoading {
-    background-color: white;
-    border-radius: 8px;
-    margin: 20px;
-}
-
-.spinner-border {
-    width: 3rem;
-    height: 3rem;
-}
 </style>
+
 {% endblock %} 
