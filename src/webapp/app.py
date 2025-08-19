@@ -18,6 +18,9 @@ from ..core.extractor import EngineeringCriteriaExtractor
 from ..models.schemas import ExtractionResult
 from ..models.document_models import ProcessingStatus
 
+# Add parent directory to path for utils import
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 def _get_base_dir() -> str:
     """Return a stable base directory both in dev and PyInstaller-frozen builds.
@@ -292,6 +295,48 @@ def create_app():
             json.dump(result_data, f, indent=2, default=str)
         
         return send_file(json_path, as_attachment=True, download_name=json_filename)
+    
+    @app.route('/download_pdf/<job_id>')
+    def download_pdf_report(job_id):
+        """
+        Generate and download PDF report for a job.
+        
+        Args:
+            job_id: Job identifier
+            
+        Returns:
+            PDF file download
+        """
+        try:
+            # Find the job
+            job = None
+            for j in jobs.values():
+                if j['id'] == job_id:
+                    job = j
+                    break
+            
+            if not job or not job.get('result') or not job['result'].design_criteria:
+                return jsonify({'error': 'Job not found or no results available'}), 404
+            
+            # Import PDF generator
+            from ..utils.pdf_report_generator import generate_pdf_report_for_job
+            
+            # Generate PDF report
+            pdf_path = generate_pdf_report_for_job(
+                job_id=job_id,
+                design_criteria=job['result'].design_criteria.dict(),
+                output_dir=app.config['OUTPUT_FOLDER'],
+                image_base_path=app.config['EXTRACTED_IMAGES_FOLDER']
+            )
+            
+            if pdf_path and os.path.exists(pdf_path):
+                return send_file(pdf_path, as_attachment=True, download_name=os.path.basename(pdf_path))
+            else:
+                return jsonify({'error': 'Failed to generate PDF report'}), 500
+                
+        except Exception as e:
+            logger.error(f"Error generating PDF report: {str(e)}")
+            return jsonify({'error': 'Internal server error'}), 500
     
     @app.route('/images/<path:filename>')
     def serve_image(filename):
