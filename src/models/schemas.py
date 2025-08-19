@@ -145,6 +145,19 @@ class DesignCriteria(BaseModel):
     tables: List[TableData] = Field(default_factory=list)
     images: List[ImageData] = Field(default_factory=list)
     
+    # Specific field types for new extraction schema
+    berthing_loads: List[Dict[str, Any]] = Field(default_factory=list, description="Berthing loads extracted from document")
+    date: List[Dict[str, Any]] = Field(default_factory=list, description="Date information extracted from document")
+    design_criteria: List[Dict[str, Any]] = Field(default_factory=list, description="Design criteria extracted from document")
+    design_loads: List[Dict[str, Any]] = Field(default_factory=list, description="Design loads extracted from document")
+    drawing_number: List[Dict[str, Any]] = Field(default_factory=list, description="Drawing number extracted from document")
+    drawing_title: List[Dict[str, Any]] = Field(default_factory=list, description="Drawing title extracted from document")
+    mooring_loads: List[Dict[str, Any]] = Field(default_factory=list, description="Mooring loads extracted from document")
+    seismic_forces_specific: List[Dict[str, Any]] = Field(default_factory=list, description="Seismic forces as specific field")
+    vertical_dead_loads: List[Dict[str, Any]] = Field(default_factory=list, description="Vertical dead loads extracted from document")
+    vertical_live_loads: List[Dict[str, Any]] = Field(default_factory=list, description="Vertical live loads extracted from document")
+    wind_loads: List[Dict[str, Any]] = Field(default_factory=list, description="Wind loads extracted from document")
+    
     # Additional engineering fields
     structural_elements: List[Dict[str, Any]] = Field(default_factory=list, description="Structural elements found in document")
     material_specifications: List[Dict[str, Any]] = Field(default_factory=list, description="Material specifications")

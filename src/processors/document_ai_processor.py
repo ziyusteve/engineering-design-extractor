@@ -428,14 +428,21 @@ class DocumentAIProcessor:
         seismic_forces = self._parse_seismic_forces(doc_ai_response)
         design_vehicles = self._parse_design_vehicles(doc_ai_response)
         design_cranes = self._parse_design_cranes(doc_ai_response)
-        tables = self._parse_tables(doc_ai_response)
+        # tables = self._parse_tables(doc_ai_response)  # Removed table extraction
         
         # Parse other specific fields from Document AI configuration
         design_criteria = self._parse_design_criteria(doc_ai_response)
         design_loads = self._parse_design_loads(doc_ai_response)
-        drg_no = self._parse_drg_no(doc_ai_response)
-        title = self._parse_title(doc_ai_response)
+        drawing_number = self._parse_drawing_number(doc_ai_response)
+        drawing_title = self._parse_drawing_title(doc_ai_response)
         date = self._parse_date(doc_ai_response)
+        
+        # Parse specific load types
+        berthing_loads = self._parse_berthing_loads(doc_ai_response)
+        mooring_loads = self._parse_mooring_loads(doc_ai_response)
+        vertical_dead_loads = self._parse_vertical_dead_loads(doc_ai_response)
+        vertical_live_loads = self._parse_vertical_live_loads(doc_ai_response)
+        wind_loads = self._parse_wind_loads(doc_ai_response)
         
 
         
@@ -519,6 +526,19 @@ class DocumentAIProcessor:
             design_cranes=design_cranes,
             tables=tables,
             images=images,
+            # New specific field types
+            berthing_loads=berthing_loads,
+            date=date,
+            design_criteria=design_criteria,
+            design_loads=design_loads,
+            drawing_number=drawing_number,
+            drawing_title=drawing_title,
+            mooring_loads=mooring_loads,
+            seismic_forces_specific=seismic_forces,  # Use existing seismic_forces as specific field too
+            vertical_dead_loads=vertical_dead_loads,
+            vertical_live_loads=vertical_live_loads,
+            wind_loads=wind_loads,
+            # Additional engineering fields
             structural_elements=structural_elements,
             material_specifications=material_specifications,
             safety_factors=safety_factors,
@@ -563,31 +583,31 @@ class DocumentAIProcessor:
         
         return design_loads
     
-    def _parse_drg_no(self, doc_ai_response: DocumentAIResponse) -> List[Dict[str, Any]]:
-        """Parse DRG_No from Document AI entities using exact field name."""
-        drg_numbers = []
+    def _parse_drawing_number(self, doc_ai_response: DocumentAIResponse) -> List[Dict[str, Any]]:
+        """Parse drawing_number from Document AI entities using exact field name."""
+        drawing_numbers = []
         
         for entity in doc_ai_response.entities:
-            if entity.type == "DRG_No":
-                drg = {
-                    "type": "drg_no",
+            if entity.type == "drawing_number":
+                drawing_num = {
+                    "type": "drawing_number",
                     "text": entity.mention_text,
                     "confidence": entity.confidence,
                     "bounding_box": entity.bounding_box,
                     "page_number": getattr(entity, 'page_number', 1)
                 }
-                drg_numbers.append(drg)
+                drawing_numbers.append(drawing_num)
         
-        return drg_numbers
+        return drawing_numbers
     
-    def _parse_title(self, doc_ai_response: DocumentAIResponse) -> List[Dict[str, Any]]:
-        """Parse Title from Document AI entities using exact field name."""
+    def _parse_drawing_title(self, doc_ai_response: DocumentAIResponse) -> List[Dict[str, Any]]:
+        """Parse drawing_title from Document AI entities using exact field name."""
         titles = []
         
         for entity in doc_ai_response.entities:
-            if entity.type == "Title":
+            if entity.type == "drawing_title":
                 title = {
-                    "type": "title",
+                    "type": "drawing_title",
                     "text": entity.mention_text,
                     "confidence": entity.confidence,
                     "bounding_box": entity.bounding_box,
@@ -613,6 +633,91 @@ class DocumentAIProcessor:
                 dates.append(date)
         
         return dates
+    
+    def _parse_berthing_loads(self, doc_ai_response: DocumentAIResponse) -> List[Dict[str, Any]]:
+        """Parse berthing_loads from Document AI entities using exact field name."""
+        berthing_loads = []
+        
+        for entity in doc_ai_response.entities:
+            if entity.type == "berthing_loads":
+                load = {
+                    "type": "berthing_loads",
+                    "text": entity.mention_text,
+                    "confidence": entity.confidence,
+                    "bounding_box": entity.bounding_box,
+                    "page_number": getattr(entity, 'page_number', 1)
+                }
+                berthing_loads.append(load)
+        
+        return berthing_loads
+    
+    def _parse_mooring_loads(self, doc_ai_response: DocumentAIResponse) -> List[Dict[str, Any]]:
+        """Parse mooring_loads from Document AI entities using exact field name."""
+        mooring_loads = []
+        
+        for entity in doc_ai_response.entities:
+            if entity.type == "mooring_loads":
+                load = {
+                    "type": "mooring_loads",
+                    "text": entity.mention_text,
+                    "confidence": entity.confidence,
+                    "bounding_box": entity.bounding_box,
+                    "page_number": getattr(entity, 'page_number', 1)
+                }
+                mooring_loads.append(load)
+        
+        return mooring_loads
+    
+    def _parse_vertical_dead_loads(self, doc_ai_response: DocumentAIResponse) -> List[Dict[str, Any]]:
+        """Parse vertical_dead_loads from Document AI entities using exact field name."""
+        vertical_dead_loads = []
+        
+        for entity in doc_ai_response.entities:
+            if entity.type == "vertical_dead_loads":
+                load = {
+                    "type": "vertical_dead_loads",
+                    "text": entity.mention_text,
+                    "confidence": entity.confidence,
+                    "bounding_box": entity.bounding_box,
+                    "page_number": getattr(entity, 'page_number', 1)
+                }
+                vertical_dead_loads.append(load)
+        
+        return vertical_dead_loads
+    
+    def _parse_vertical_live_loads(self, doc_ai_response: DocumentAIResponse) -> List[Dict[str, Any]]:
+        """Parse vertical_live_loads from Document AI entities using exact field name."""
+        vertical_live_loads = []
+        
+        for entity in doc_ai_response.entities:
+            if entity.type == "vertical_live_loads":
+                load = {
+                    "type": "vertical_live_loads",
+                    "text": entity.mention_text,
+                    "confidence": entity.confidence,
+                    "bounding_box": entity.bounding_box,
+                    "page_number": getattr(entity, 'page_number', 1)
+                }
+                vertical_live_loads.append(load)
+        
+        return vertical_live_loads
+    
+    def _parse_wind_loads(self, doc_ai_response: DocumentAIResponse) -> List[Dict[str, Any]]:
+        """Parse wind_loads from Document AI entities using exact field name."""
+        wind_loads = []
+        
+        for entity in doc_ai_response.entities:
+            if entity.type == "wind_loads":
+                load = {
+                    "type": "wind_loads",
+                    "text": entity.mention_text,
+                    "confidence": entity.confidence,
+                    "bounding_box": entity.bounding_box,
+                    "page_number": getattr(entity, 'page_number', 1)
+                }
+                wind_loads.append(load)
+        
+        return wind_loads
     
     def _parse_structural_elements(self, doc_ai_response: DocumentAIResponse) -> List[Dict[str, Any]]:
         """Parse structural elements from Document AI entities."""
@@ -1614,7 +1719,7 @@ class DocumentAIProcessor:
                 image_type=field_type,
                 description=description,
                 confidence=1.0,  # High confidence since we're cropping from detected entities
-                file_path=os.path.join(job_id, image_filename)
+                file_path=os.path.join(os.path.basename(job_output_dir), image_filename)
             )
             
             logger.info(f"Extracted image for {field_type}: {description}")
