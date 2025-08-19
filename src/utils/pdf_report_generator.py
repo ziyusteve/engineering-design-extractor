@@ -411,34 +411,34 @@ class EngineeringPDFReportGenerator:
         if not images or not image_base_path:
             return
         
-        # Try to find matching image by entity type or text content
+        # Try to find matching image by entity type with exact matching
         matching_images = []
         
         for image in images:
             image_type = image.get('image_type', '').lower()
+            file_path = image.get('file_path', '').lower()
             description = image.get('description', '').lower()
             
-            # Match by entity type (handle different naming conventions)
-            entity_type_variations = [
-                entity_type.lower(),
-                entity_type.lower().replace('_', ''),
-                entity_type.lower().replace(' ', ''),
-                f"entity_{entity_type.lower()}",
-                f"entity{entity_type.lower()}",
-            ]
+            # Exact match: entity type should match the image type exactly
+            expected_image_type = f"entity_{entity_type.lower()}"
             
-            if any(variation in image_type for variation in entity_type_variations):
-                matching_images.append(image)
-            # Match by text content
-            elif entity_text and len(entity_text) > 3:
-                # Check if any significant words from entity text appear in image description
-                entity_words = [word.lower() for word in entity_text.split() if len(word) > 3][:3]
-                if any(word in description for word in entity_words):
-                    matching_images.append(image)
+            # Check for exact match first
+            if image_type == expected_image_type:
+                matching_images.append((image, 1))  # Priority 1 (highest)
+            # Check file path for match (handles naming variations)
+            elif entity_type.lower().replace('_', '') in file_path:
+                matching_images.append((image, 2))  # Priority 2
+            # Match by entity type in description (as fallback)
+            elif entity_type.lower() in description and f"{entity_type.lower()} entity:" in description:
+                matching_images.append((image, 3))  # Priority 3 (lowest)
         
-        # Add the first matching image
-        for image in matching_images[:1]:  # Only add first match
-            file_path = image.get('file_path')
+        # Sort by priority and take the best match
+        if matching_images:
+            matching_images.sort(key=lambda x: x[1])  # Sort by priority (lower is better)
+            best_match = matching_images[0][0]  # Get the image from the best match
+            
+            # Use the best matching image
+            file_path = best_match.get('file_path')
             if file_path:
                 full_image_path = os.path.join(image_base_path, file_path)
                 
@@ -463,7 +463,7 @@ class EngineeringPDFReportGenerator:
                         rl_img = RLImage(full_image_path, width=final_width, height=final_height)
                         story.append(rl_img)
                         story.append(Paragraph(f"<i>Entity Image: {os.path.basename(file_path)}</i>", self.styles['Metadata']))
-                        break  # Successfully added image, exit
+                        return  # Successfully added image, exit
                         
                     except Exception as e:
                         logger.warning(f"Could not add entity image {full_image_path}: {str(e)}")
