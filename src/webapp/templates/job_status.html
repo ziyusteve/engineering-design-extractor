@@ -209,11 +209,15 @@
                 <div class="card">
                     <div class="card-header bg-secondary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-image me-2"></i>
-                            Extracted Images ({{ job.result.design_criteria.images|length }})
+                            <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start collapse-button" type="button" data-bs-toggle="collapse" data-bs-target="#extractedImagesCollapse" aria-expanded="false" aria-controls="extractedImagesCollapse">
+                                <i class="fas fa-image me-2"></i>
+                                Extracted Images ({{ job.result.design_criteria.images|length }})
+                                <i class="fas fa-chevron-down float-end mt-1"></i>
+                            </button>
                         </h5>
                     </div>
-                    <div class="card-body">
+                    <div class="collapse" id="extractedImagesCollapse">
+                        <div class="card-body">
                         <div class="row">
                             {% for image in job.result.design_criteria.images[:6] %}
                             <div class="col-md-4 mb-3">
@@ -249,6 +253,7 @@
                         {% if job.result.design_criteria.images|length > 6 %}
                         <p class="text-muted small text-center">Showing first 6 of {{ job.result.design_criteria.images|length }} images</p>
                         {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -364,11 +369,15 @@
                 <div class="card">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-robot me-2"></i>
-                            Document AI Entities ({{ job.result.design_criteria.document_ai_entities|length }})
+                            <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start collapse-button" type="button" data-bs-toggle="collapse" data-bs-target="#documentAIEntitiesCollapse" aria-expanded="false" aria-controls="documentAIEntitiesCollapse">
+                                <i class="fas fa-robot me-2"></i>
+                                Document AI Entities ({{ job.result.design_criteria.document_ai_entities|length }})
+                                <i class="fas fa-chevron-down float-end mt-1"></i>
+                            </button>
                         </h5>
                     </div>
-                    <div class="card-body">
+                    <div class="collapse" id="documentAIEntitiesCollapse">
+                        <div class="card-body">
                         {% for entity in job.result.design_criteria.document_ai_entities %}
                         <div class="mb-4 p-3 border rounded">
                             <div class="row">
@@ -405,6 +414,7 @@
                             </div>
                         </div>
                         {% endfor %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -416,12 +426,17 @@
                 <div class="card">
                     <div class="card-header bg-info text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-file-text me-2"></i>
-                            Raw Extracted Text
+                            <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start collapse-button" type="button" data-bs-toggle="collapse" data-bs-target="#rawTextCollapse" aria-expanded="false" aria-controls="rawTextCollapse">
+                                <i class="fas fa-file-text me-2"></i>
+                                Raw Extracted Text
+                                <i class="fas fa-chevron-down float-end mt-1"></i>
+                            </button>
                         </h5>
                     </div>
-                    <div class="card-body">
-                        <pre style="font-size: 0.85em; white-space: pre-wrap; background-color: #f8f9fa; padding: 1rem; border-radius: 0.25rem; max-height: 400px; overflow-y: auto;">{{ job.result.design_criteria.raw_text }}</pre>
+                    <div class="collapse" id="rawTextCollapse">
+                        <div class="card-body">
+                            <pre style="font-size: 0.85em; white-space: pre-wrap; background-color: #f8f9fa; padding: 1rem; border-radius: 0.25rem; max-height: 400px; overflow-y: auto;">{{ job.result.design_criteria.raw_text }}</pre>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -471,6 +486,51 @@ function checkJobStatus() {
 
 // Check status every 5 seconds
 setInterval(checkJobStatus, 5000);
+
+// Handle collapse arrow rotation
+document.addEventListener('DOMContentLoaded', function() {
+    const collapseElements = ['extractedImagesCollapse', 'documentAIEntitiesCollapse', 'rawTextCollapse'];
+    
+    collapseElements.forEach(function(elementId) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.addEventListener('show.bs.collapse', function () {
+                const button = document.querySelector('[data-bs-target="#' + elementId + '"]');
+                if (button) {
+                    const icon = button.querySelector('.fa-chevron-down');
+                    if (icon) {
+                        icon.classList.remove('fa-chevron-down');
+                        icon.classList.add('fa-chevron-up');
+                    }
+                }
+            });
+            
+            element.addEventListener('hide.bs.collapse', function () {
+                const button = document.querySelector('[data-bs-target="#' + elementId + '"]');
+                if (button) {
+                    const icon = button.querySelector('.fa-chevron-up');
+                    if (icon) {
+                        icon.classList.remove('fa-chevron-up');
+                        icon.classList.add('fa-chevron-down');
+                    }
+                }
+            });
+        }
+    });
+});
 </script>
 {% endif %}
+
+<style>
+.btn-link:focus {
+    box-shadow: none;
+}
+.collapse-button {
+    transition: all 0.3s ease;
+}
+.collapse-button:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+</style>
+
 {% endblock %} 
