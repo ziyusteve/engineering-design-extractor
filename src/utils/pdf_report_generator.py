@@ -117,20 +117,7 @@ class EngineeringPDFReportGenerator:
             
             story = []
             
-            # Add title and metadata
-            self._add_title_section(story, design_criteria)
-            
-            # Add document metadata
-            self._add_metadata_section(story, design_criteria)
-            
-            # Add summary table
-            summary_table = self._create_summary_table(design_criteria)
-            if summary_table:
-                story.append(Paragraph("Extraction Summary", self.styles['SectionHeader']))
-                story.append(summary_table)
-                story.append(Spacer(1, 20))
-            
-            # Add Document AI entities section only
+            # Add Document AI entities section only (no title, metadata, or summary)
             self._add_entities_section(story, design_criteria, image_base_path, job_id)
             
             # Build PDF
