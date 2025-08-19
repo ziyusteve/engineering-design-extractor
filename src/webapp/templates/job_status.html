@@ -203,6 +203,63 @@
             </div>
             {% endif %}
 
+            <!-- Document AI Entities -->
+            {% if job.result.design_criteria.document_ai_entities %}
+            <div class="col-12 mb-4">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start collapse-button" type="button" data-bs-toggle="collapse" data-bs-target="#documentAIEntitiesCollapse" aria-expanded="false" aria-controls="documentAIEntitiesCollapse">
+                                <i class="fas fa-robot me-2"></i>
+                                Document AI Entities ({{ job.result.design_criteria.document_ai_entities|length }})
+                                <i class="fas fa-chevron-down float-end mt-1"></i>
+                            </button>
+                        </h5>
+                    </div>
+                    <div class="collapse" id="documentAIEntitiesCollapse">
+                        <div class="card-body">
+                        {% for entity in job.result.design_criteria.document_ai_entities %}
+                        <div class="mb-4 p-3 border rounded">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h6 class="mb-2">
+                                        <span class="badge bg-primary me-2">{{ entity.type }}</span>
+                                        Confidence: {{ "%.1f"|format(entity.confidence * 100) }}%
+                                    </h6>
+                                    <p class="mb-2" style="font-family: monospace; white-space: pre-wrap;">{{ entity.text }}</p>
+                                    {% if entity.bounding_box %}
+                                    <small class="text-muted">
+                                        Bounding Box: ({{ "%.0f"|format(entity.bounding_box.x) }}, {{ "%.0f"|format(entity.bounding_box.y) }}, 
+                                        {{ "%.0f"|format(entity.bounding_box.width) }}, {{ "%.0f"|format(entity.bounding_box.height) }})
+                                    </small>
+                                    {% endif %}
+                                </div>
+                                <div class="col-md-4">
+                                    <!-- Entity Image -->
+                                    {% set entity_image_found = false %}
+                                    {% for image in job.result.design_criteria.images %}
+                                        {% if image.image_type and image.image_type.startswith('entity_') and entity.type.lower() in image.image_type %}
+                                            <div class="text-center">
+                                                <img src="{{ url_for('serve_image', job_id=job.job_id, filename=image.file_path) }}" 
+                                                     class="img-fluid rounded border" 
+                                                     style="max-height: 150px; max-width: 100%;"
+                                                     alt="{{ entity.type }} entity image">
+                                                <small class="text-muted d-block mt-1">{{ entity.type }} Entity Image</small>
+                                            </div>
+                                            {% set entity_image_found = true %}
+                                        {% endif %}
+                                    {% endfor %}
+
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Extracted Images -->
             {% if job.result.design_criteria.images %}
             <div class="col-12 mb-4">
@@ -358,63 +415,6 @@
                             </small>
                         </div>
                         {% endfor %}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- Document AI Entities -->
-            {% if job.result.design_criteria.document_ai_entities %}
-            <div class="col-12 mb-4">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">
-                            <button class="btn btn-link text-white text-decoration-none p-0 w-100 text-start collapse-button" type="button" data-bs-toggle="collapse" data-bs-target="#documentAIEntitiesCollapse" aria-expanded="false" aria-controls="documentAIEntitiesCollapse">
-                                <i class="fas fa-robot me-2"></i>
-                                Document AI Entities ({{ job.result.design_criteria.document_ai_entities|length }})
-                                <i class="fas fa-chevron-down float-end mt-1"></i>
-                            </button>
-                        </h5>
-                    </div>
-                    <div class="collapse" id="documentAIEntitiesCollapse">
-                        <div class="card-body">
-                        {% for entity in job.result.design_criteria.document_ai_entities %}
-                        <div class="mb-4 p-3 border rounded">
-                            <div class="row">
-                                <div class="col-md-8">
-                                    <h6 class="mb-2">
-                                        <span class="badge bg-primary me-2">{{ entity.type }}</span>
-                                        Confidence: {{ "%.1f"|format(entity.confidence * 100) }}%
-                                    </h6>
-                                    <p class="mb-2" style="font-family: monospace; white-space: pre-wrap;">{{ entity.text }}</p>
-                                    {% if entity.bounding_box %}
-                                    <small class="text-muted">
-                                        Bounding Box: ({{ "%.0f"|format(entity.bounding_box.x) }}, {{ "%.0f"|format(entity.bounding_box.y) }}, 
-                                        {{ "%.0f"|format(entity.bounding_box.width) }}, {{ "%.0f"|format(entity.bounding_box.height) }})
-                                    </small>
-                                    {% endif %}
-                                </div>
-                                <div class="col-md-4">
-                                    <!-- Entity Image -->
-                                    {% set entity_image_found = false %}
-                                    {% for image in job.result.design_criteria.images %}
-                                        {% if image.image_type and image.image_type.startswith('entity_') and entity.type.lower() in image.image_type %}
-                                            <div class="text-center">
-                                                <img src="{{ url_for('serve_image', job_id=job.job_id, filename=image.file_path) }}" 
-                                                     class="img-fluid rounded border" 
-                                                     style="max-height: 150px; max-width: 100%;"
-                                                     alt="{{ entity.type }} entity image">
-                                                <small class="text-muted d-block mt-1">{{ entity.type }} Entity Image</small>
-                                            </div>
-                                            {% set entity_image_found = true %}
-                                        {% endif %}
-                                    {% endfor %}
-
-                                </div>
-                            </div>
-                        </div>
-                        {% endfor %}
-                        </div>
                     </div>
                 </div>
             </div>

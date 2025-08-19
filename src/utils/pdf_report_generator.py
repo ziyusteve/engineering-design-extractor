@@ -130,14 +130,8 @@ class EngineeringPDFReportGenerator:
                 story.append(summary_table)
                 story.append(Spacer(1, 20))
             
-            # Add extracted fields sections
-            self._add_specific_fields_section(story, design_criteria, image_base_path, job_id)
-            
-            # Add Document AI entities section
+            # Add Document AI entities section only
             self._add_entities_section(story, design_criteria, image_base_path, job_id)
-            
-            # Add raw text section
-            self._add_raw_text_section(story, design_criteria)
             
             # Build PDF
             doc.build(story)
@@ -339,7 +333,6 @@ class EngineeringPDFReportGenerator:
         if not entities:
             return
         
-        story.append(PageBreak())
         story.append(Paragraph("Document AI Entities", self.styles['SectionHeader']))
         
         # Get images for matching
@@ -474,6 +467,84 @@ class EngineeringPDFReportGenerator:
                         
                     except Exception as e:
                         logger.warning(f"Could not add entity image {full_image_path}: {str(e)}")
+    
+    def _add_extracted_images_section(self, story: List, design_criteria: Dict[str, Any], 
+                                     image_base_path: str, job_id: str):
+        """Add extracted images section showing all available images."""
+        images = design_criteria.get('images', [])
+        if not images:
+            return
+        
+        story.append(PageBreak())
+        story.append(Paragraph("Extracted Images", self.styles['SectionHeader']))
+        
+        # Limit to first 6 images like the web interface
+        for i, image in enumerate(images[:6]):
+            # Image header
+            image_type = image.get('image_type', 'Unknown')
+            description = image.get('description', 'No description available')
+            confidence = image.get('confidence', 0)
+            
+            header_text = f"<b>Image {i+1}: {image_type}</b> (Confidence: {confidence * 100:.1f}%)"
+            story.append(Paragraph(header_text, self.styles['FieldHeader']))
+            
+            # Image description
+            if description and len(description) > 10:
+                # Truncate long descriptions
+                short_desc = description[:200] + "..." if len(description) > 200 else description
+                story.append(Paragraph(f"<i>{short_desc}</i>", self.styles['Metadata']))
+            
+            # Add the actual image
+            file_path = image.get('file_path')
+            if file_path and image_base_path:
+                full_image_path = os.path.join(image_base_path, file_path)
+                
+                if os.path.exists(full_image_path):
+                    try:
+                        # Check image dimensions and resize if needed
+                        with Image.open(full_image_path) as img:
+                            img_width, img_height = img.size
+                            
+                            # Calculate scaling to fit within reasonable bounds
+                            max_width = 6 * inch
+                            max_height = 4 * inch
+                            
+                            width_scale = max_width / img_width
+                            height_scale = max_height / img_height
+                            scale = min(width_scale, height_scale, 1.0)
+                            
+                            final_width = img_width * scale
+                            final_height = img_height * scale
+                        
+                        # Add image to story
+                        rl_img = RLImage(full_image_path, width=final_width, height=final_height)
+                        story.append(rl_img)
+                        
+                        # Add image metadata
+                        page_num = image.get('page_number', 0)
+                        bbox = image.get('bounding_box')
+                        metadata_text = f"<i>File: {os.path.basename(file_path)}"
+                        if page_num is not None:
+                            metadata_text += f" | Page: {page_num}"
+                        if bbox:
+                            metadata_text += f" | Location: ({bbox.get('x', 0):.0f}, {bbox.get('y', 0):.0f})"
+                        metadata_text += "</i>"
+                        
+                        story.append(Paragraph(metadata_text, self.styles['Metadata']))
+                        
+                    except Exception as e:
+                        logger.warning(f"Could not add extracted image {full_image_path}: {str(e)}")
+                        story.append(Paragraph(f"<i>Error loading image: {os.path.basename(file_path)}</i>", self.styles['Metadata']))
+                else:
+                    story.append(Paragraph(f"<i>Image file not found: {file_path}</i>", self.styles['Metadata']))
+            
+            story.append(Spacer(1, 20))
+        
+        # Add note if there are more images
+        if len(images) > 6:
+            note_text = f"<i>Showing first 6 of {len(images)} images</i>"
+            story.append(Paragraph(note_text, self.styles['Metadata']))
+            story.append(Spacer(1, 20))
     
     def _add_raw_text_section(self, story: List, design_criteria: Dict[str, Any]):
         """Add raw extracted text section."""
