@@ -357,10 +357,14 @@ class EngineeringPDFReportGenerator:
                            f"width={bbox.get('width', 0):.0f}, height={bbox.get('height', 0):.0f}"
                 story.append(Paragraph(bbox_text, self.styles['Metadata']))
             
+            # Add spacing before image
+            story.append(Spacer(1, 10))
+            
             # Add entity image if available - use both methods for better matching
             self._add_entity_image_from_results(story, entity_type, entity_text, images, image_base_path)
             
-            story.append(Spacer(1, 20))
+            # Add larger spacing between entities
+            story.append(Spacer(1, 30))
     
     def _add_entity_image(self, story: List, entity_type: str, index: int, 
                          image_base_path: str, job_id: str):
@@ -459,10 +463,32 @@ class EngineeringPDFReportGenerator:
                             final_width = img_width * scale
                             final_height = img_height * scale
                         
-                        # Add image to story
+                        # Add image with border and spacing
+                        story.append(Spacer(1, 15))  # Space before image
+                        
+                        # Create image with border using Table
                         rl_img = RLImage(full_image_path, width=final_width, height=final_height)
-                        story.append(rl_img)
-                        story.append(Paragraph(f"<i>Entity Image: {os.path.basename(file_path)}</i>", self.styles['Metadata']))
+                        image_caption = Paragraph(f"<i>Entity Image: {os.path.basename(file_path)}</i>", self.styles['Metadata'])
+                        
+                        # Create table with image and caption for border effect
+                        image_table = Table([[rl_img], [image_caption]], colWidths=[final_width + 40])
+                        image_table.setStyle(TableStyle([
+                            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                            ('GRID', (0, 0), (-1, -1), 3, colors.black),  # Thicker black border
+                            ('BACKGROUND', (0, 0), (0, 0), colors.lightgrey),  # Light background for image
+                            ('BACKGROUND', (0, 1), (0, 1), colors.white),     # White background for caption
+                            ('LEFTPADDING', (0, 0), (-1, -1), 15),   # Increased padding
+                            ('RIGHTPADDING', (0, 0), (-1, -1), 15),  # Increased padding
+                            ('TOPPADDING', (0, 0), (0, 0), 15),     # Image cell top padding
+                            ('BOTTOMPADDING', (0, 0), (0, 0), 10),  # Image cell bottom padding
+                            ('TOPPADDING', (0, 1), (0, 1), 8),      # Caption cell top padding
+                            ('BOTTOMPADDING', (0, 1), (0, 1), 15),  # Caption cell bottom padding
+                            ('ROWBACKGROUNDS', (0, 0), (-1, -1), [colors.lightgrey, colors.white]),
+                        ]))
+                        
+                        story.append(image_table)
+                        story.append(Spacer(1, 20))  # Space after image
                         return  # Successfully added image, exit
                         
                     except Exception as e:
