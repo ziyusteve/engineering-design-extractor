@@ -1620,10 +1620,10 @@ class DocumentAIProcessor:
     
     def _crop_image_from_bounding_box(self, bounding_box, description, field_type, page_image_map, job_output_dir, image_count, file_path):
         """
-        Crop an image from a page based on bounding box coordinates.
+        Crop an image from a page based on bounding box coordinates with high resolution.
         """
         try:
-            from PIL import Image
+            from PIL import Image, ImageEnhance
             
             # Get page number from bounding box (assuming it's stored in the bounding box)
             page_number = bounding_box.get('page_number', 1)
@@ -1632,9 +1632,13 @@ class DocumentAIProcessor:
                 logger.warning(f"Page {page_number} image not found for cropping")
                 return None
             
-            # Open the page image
+            # Open the page image with high quality
             page_image_path = page_image_map[page_number]
             page_image = Image.open(page_image_path)
+            
+            # Convert to RGB if necessary for better quality
+            if page_image.mode != 'RGB':
+                page_image = page_image.convert('RGB')
             
             # Get bounding box coordinates
             x = bounding_box.get('x', 0)
@@ -1642,14 +1646,10 @@ class DocumentAIProcessor:
             width = bounding_box.get('width', 0)
             height = bounding_box.get('height', 0)
             
-            # Convert Document AI coordinates to pixel coordinates
-            # Document AI coordinates are in points (1/72 inch) relative to the PDF page
-            # We need to get the actual PDF page dimensions and scale accordingly
-            
             # Get the page dimensions from the image
             img_width, img_height = page_image.size
             
-            # Try to get the actual PDF page dimensions
+            # Try to get the actual PDF page dimensions for precise scaling
             try:
                 import fitz  # PyMuPDF
                 pdf_doc = fitz.open(file_path)
@@ -1660,29 +1660,60 @@ class DocumentAIProcessor:
                     pdf_height = pdf_rect.height
                     pdf_doc.close()
                     
+                    # Document AI coordinates are in points (1/72 inch) relative to PDF page
+                    # We need to handle coordinate system differences
+                    
+                    # Check if we need to flip Y coordinates (Document AI vs PDF coordinate systems)
+                    # Document AI typically uses top-left origin, PDF may use bottom-left
+                    y_coord = pdf_height - y - height  # Flip Y coordinate if needed
+                    
                     # Calculate scale factors based on actual PDF page dimensions
                     scale_x = img_width / pdf_width
                     scale_y = img_height / pdf_height
-                    scale_factor = min(scale_x, scale_y)  # Use the smaller scale to maintain aspect ratio
                     
-                    logger.info(f"PDF page dimensions: {pdf_width}x{pdf_height}, Image dimensions: {img_width}x{img_height}, Scale factor: {scale_factor}")
+                    # Use the smaller scale to maintain aspect ratio and ensure image fits
+                    scale_factor = min(scale_x, scale_y)
+                    
+                    logger.info(f"PDF page dimensions: {pdf_width}x{pdf_height}, Image dimensions: {img_width}x{img_height}")
+                    logger.info(f"Scale factors: x={scale_x:.3f}, y={scale_y:.3f}, using={scale_factor:.3f}")
+                    logger.info(f"Original coordinates: x={x}, y={y}, width={width}, height={height}")
+                    logger.info(f"Adjusted Y coordinate: {y_coord}")
                 else:
                     # Fallback to standard A4 dimensions
                     scale_factor = min(img_width / 595.0, img_height / 842.0)
+                    y_coord = 842.0 - y - height  # A4 height is 842 points
                     logger.warning(f"Page {page_number} not found, using fallback scale factor: {scale_factor}")
             except Exception as e:
                 # Fallback to standard A4 dimensions
                 scale_factor = min(img_width / 595.0, img_height / 842.0)
+                y_coord = 842.0 - y - height  # A4 height is 842 points
                 logger.warning(f"Could not get PDF page dimensions, using fallback scale factor: {scale_factor}")
             
             # Convert coordinates using the calculated scale factor
             left = int(x * scale_factor)
-            upper = int(y * scale_factor)
+            upper = int(y_coord * scale_factor)
             right = int((x + width) * scale_factor)
-            lower = int((y + height) * scale_factor)
+            lower = int((y_coord + height) * scale_factor)
             
-            # Add buffer around the crop area
-            buffer = 10
+            # Add adaptive buffer around the crop area based on content size and entity type
+            # Different buffer strategies for different entity types
+            content_size = width * height
+            
+            # Entity-specific buffer strategies
+            if field_type in ['drawing_title', 'drawing_number', 'date']:
+                # These are usually small, precise elements - minimal buffer
+                buffer = 5
+            elif field_type in ['design_criteria']:
+                # Design criteria can be longer text - moderate buffer
+                buffer = 10
+            elif content_size < 1000:  # Small content
+                buffer = 15
+            elif content_size < 10000:  # Medium content
+                buffer = 12
+            else:  # Large content
+                buffer = 8
+            
+            # Apply buffer with bounds checking
             left = max(0, left - buffer)
             upper = max(0, upper - buffer)
             right = min(page_image.width, right + buffer)
@@ -1703,26 +1734,36 @@ class DocumentAIProcessor:
             # Crop the image
             cropped_image = page_image.crop((left, upper, right, lower))
             
-            # Save the cropped image
+            # Enhance image quality
+            # Increase sharpness slightly
+            enhancer = ImageEnhance.Sharpness(cropped_image)
+            cropped_image = enhancer.enhance(1.2)
+            
+            # Enhance contrast slightly
+            enhancer = ImageEnhance.Contrast(cropped_image)
+            cropped_image = enhancer.enhance(1.1)
+            
+            # Save the cropped image with high quality
             safe_description = "".join(c for c in description if c.isalnum() or c in (' ', '-', '_')).rstrip()
             safe_description = safe_description.replace(' ', '_')[:30]  # Limit length
-            image_filename = f"{field_type}_{safe_description}_{image_count + 1}.png"
+            image_filename = f"entity_{field_type.lower().replace('_', '')}_{image_count + 1}.png"
             image_path = os.path.join(job_output_dir, image_filename)
             
-            cropped_image.save(image_path)
+            # Save with high quality settings
+            cropped_image.save(image_path, 'PNG', optimize=False, quality=95)
             
             # Create ImageData object
             image_data = ImageData(
                 image_id=f"{field_type}_image_{image_count + 1}",
                 page_number=page_number,
                 bounding_box=bounding_box,
-                image_type=field_type,
+                image_type=f"entity_{field_type.lower()}",
                 description=description,
                 confidence=1.0,  # High confidence since we're cropping from detected entities
                 file_path=os.path.join(os.path.basename(job_output_dir), image_filename)
             )
             
-            logger.info(f"Extracted image for {field_type}: {description}")
+            logger.info(f"Extracted high-quality image for {field_type}: {description}")
             return image_data
             
         except Exception as e:

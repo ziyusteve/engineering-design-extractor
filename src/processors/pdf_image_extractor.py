@@ -79,9 +79,13 @@ class PDFImageExtractor:
                             pix = None
                             continue
                         
-                        # Save image temporarily to check file size
+                        # Convert to RGB if necessary for better quality
+                        if pil_image.mode != 'RGB':
+                            pil_image = pil_image.convert('RGB')
+                        
+                        # Save image temporarily to check file size with high quality
                         temp_path = os.path.join(job_output_dir, f"temp_{page_num + 1}_{img_index + 1}.png")
-                        pil_image.save(temp_path)
+                        pil_image.save(temp_path, 'PNG', optimize=False, quality=95)
                         
                         # Check file size
                         file_size = os.path.getsize(temp_path)
@@ -126,14 +130,14 @@ class PDFImageExtractor:
             logger.error(f"Error extracting images from PDF {pdf_path}: {str(e)}")
             return []
     
-    def extract_pages_as_images(self, pdf_path: str, job_id: str, dpi: int = 150) -> List[str]:
+    def extract_pages_as_images(self, pdf_path: str, job_id: str, dpi: int = 300) -> List[str]:
         """
-        Extract full pages as images from PDF file.
+        Extract full pages as images from PDF file with high resolution.
         
         Args:
             pdf_path: Path to the PDF file
             job_id: Job identifier for organizing output
-            dpi: Resolution for page rendering
+            dpi: Resolution for page rendering (default: 300 for high quality)
             
         Returns:
             List of paths to extracted page images
@@ -151,31 +155,38 @@ class PDFImageExtractor:
             for page_num in range(len(pdf_document)):
                 page = pdf_document[page_num]
                 
-                # Create transformation matrix for desired DPI
+                # Create transformation matrix for high DPI rendering
+                # Use higher DPI for better quality
                 mat = fitz.Matrix(dpi/72, dpi/72)  # 72 is the default DPI
                 
-                # Render page to pixmap
-                pix = page.get_pixmap(matrix=mat)
+                # Render page to pixmap with high quality
+                pix = page.get_pixmap(matrix=mat, alpha=False)
                 
                 # Convert to PIL Image
                 img_data = pix.tobytes("png")
                 pil_image = Image.open(io.BytesIO(img_data))
                 
-                # Save page image
+                # Convert to RGB if necessary for better quality
+                if pil_image.mode != 'RGB':
+                    pil_image = pil_image.convert('RGB')
+                
+                # Save page image with high quality
                 page_filename = f"page_{page_num + 1}.png"
                 page_path = os.path.join(job_output_dir, page_filename)
-                pil_image.save(page_path)
+                
+                # Save with high quality settings
+                pil_image.save(page_path, 'PNG', optimize=False, quality=95)
                 
                 extracted_files.append(page_path)
                 
-                logger.info(f"Extracted page {page_num + 1} as image: {pil_image.size[0]}x{pil_image.size[1]}")
+                logger.info(f"Extracted high-quality page {page_num + 1} as image: {pil_image.size[0]}x{pil_image.size[1]} at {dpi} DPI")
                 
                 # Clean up
                 pix = None
             
             pdf_document.close()
             
-            logger.info(f"Successfully extracted {len(extracted_files)} pages as images")
+            logger.info(f"Successfully extracted {len(extracted_files)} pages as high-quality images at {dpi} DPI")
             return extracted_files
             
         except Exception as e:

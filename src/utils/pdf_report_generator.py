@@ -402,7 +402,7 @@ class EngineeringPDFReportGenerator:
         if not images or not image_base_path:
             return
         
-        # Try to find matching image by entity type with exact matching
+        # Try to find matching image by entity type with improved matching
         matching_images = []
         
         for image in images:
@@ -410,18 +410,18 @@ class EngineeringPDFReportGenerator:
             file_path = image.get('file_path', '').lower()
             description = image.get('description', '').lower()
             
-            # Exact match: entity type should match the image type exactly
-            expected_image_type = f"entity_{entity_type.lower()}"
-            
-            # Check for exact match first
-            if image_type == expected_image_type:
-                matching_images.append((image, 1))  # Priority 1 (highest)
-            # Check file path for match (handles naming variations)
-            elif entity_type.lower().replace('_', '') in file_path:
-                matching_images.append((image, 2))  # Priority 2
-            # Match by entity type in description (as fallback)
-            elif entity_type.lower() in description and f"{entity_type.lower()} entity:" in description:
-                matching_images.append((image, 3))  # Priority 3 (lowest)
+            # Priority 1: Exact match by image_type
+            if image_type == f"entity_{entity_type.lower()}":
+                matching_images.append((image, 1))
+            # Priority 2: Match by entity type in file_path (handles variations)
+            elif entity_type.lower().replace('_', '') in file_path.replace('_', ''):
+                matching_images.append((image, 2))
+            # Priority 3: Match by key words in entity type (more specific matching)
+            elif all(word in file_path for word in entity_type.lower().split('_')):
+                matching_images.append((image, 3))
+            # Priority 4: Match by entity type in description
+            elif entity_type.lower() in description:
+                matching_images.append((image, 4))
         
         # Sort by priority and take the best match
         if matching_images:
