@@ -23,7 +23,7 @@ pip install -r requirements.txt
 
 ### 3. Run the Web App (development)
 ```bash
-python -m src.webapp.run
+python3 -m src.webapp.run
 ```
 Visit http://localhost:5000 to upload PDFs and view results.
 
