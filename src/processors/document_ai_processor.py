@@ -1280,7 +1280,12 @@ class DocumentAIProcessor:
                             page_number = 1
                         
                         # Get the corresponding page image
-                        page_image_path = page_images[page_number - 1] if page_number <= len(page_images) else page_images[0]
+                        # CRITICAL FIX: Document AI page numbering vs our page file indexing
+                        # Document AI page 0 -> page_1.png (index 0), page 1 -> page_2.png (index 1), page 2 -> page_3.png (index 2)
+                        # So we need: page_images[page_number] instead of page_images[page_number - 1]
+                        page_index = page_number if page_number < len(page_images) else 0
+                        page_image_path = page_images[page_index]
+                        logger.info(f"Entity {entity.type_} on Document AI page {page_number} using {os.path.basename(page_image_path)} (index {page_index})")
                         
                         # Extract coordinates
                         x = bounding_box["x"]
@@ -1495,7 +1500,12 @@ class DocumentAIProcessor:
                 if filename.startswith('page_') and filename.endswith('.png'):
                     try:
                         page_num = int(filename.replace('page_', '').replace('.png', ''))
-                        page_image_map[page_num] = page_path
+                        # Document AI page numbers are 0-indexed, but our filenames are 1-indexed
+                        # So page_1.png corresponds to Document AI page 0, page_2.png to page 1, etc.
+                        # But based on testing, we need to add 1 to get the correct mapping
+                        doc_ai_page = page_num - 1
+                        page_image_map[doc_ai_page] = page_path
+                        logger.info(f"Mapped Document AI page {doc_ai_page} to {filename}")
                     except ValueError:
                         continue
             
@@ -1618,15 +1628,17 @@ class DocumentAIProcessor:
         
         return extracted_images
     
-    def _crop_image_from_bounding_box(self, bounding_box, description, field_type, page_image_map, job_output_dir, image_count, file_path):
+    def _crop_image_from_bounding_box(self, bounding_box, description, field_type, page_image_map, job_output_dir, image_count, file_path, page_number=None):
         """
         Crop an image from a page based on bounding box coordinates with high resolution.
         """
         try:
             from PIL import Image, ImageEnhance
             
-            # Get page number from bounding box (assuming it's stored in the bounding box)
-            page_number = bounding_box.get('page_number', 1)
+            # Get page number from parameter or fallback to default
+            if page_number is None:
+                page_number = bounding_box.get('page_number', 1)
+                logger.warning(f"Page number not provided for {field_type}, using fallback: {page_number}")
             
             if page_number not in page_image_map:
                 logger.warning(f"Page {page_number} image not found for cropping")
@@ -1640,99 +1652,77 @@ class DocumentAIProcessor:
             if page_image.mode != 'RGB':
                 page_image = page_image.convert('RGB')
             
-            # Get bounding box coordinates
-            x = bounding_box.get('x', 0)
-            y = bounding_box.get('y', 0)
-            width = bounding_box.get('width', 0)
-            height = bounding_box.get('height', 0)
+            # Get bounding box coordinates (these are normalized coordinates 0-1)
+            x_norm = bounding_box.get('x', 0)
+            y_norm = bounding_box.get('y', 0)
+            width_norm = bounding_box.get('width', 0)
+            height_norm = bounding_box.get('height', 0)
             
             # Get the page dimensions from the image
             img_width, img_height = page_image.size
             
-            # Try to get the actual PDF page dimensions for precise scaling
-            try:
-                import fitz  # PyMuPDF
-                pdf_doc = fitz.open(file_path)
-                if page_number <= len(pdf_doc):
-                    pdf_page = pdf_doc[page_number - 1]  # 0-indexed
-                    pdf_rect = pdf_page.rect
-                    pdf_width = pdf_rect.width
-                    pdf_height = pdf_rect.height
-                    pdf_doc.close()
-                    
-                    # Document AI coordinates are in points (1/72 inch) relative to PDF page
-                    # We need to handle coordinate system differences
-                    
-                    # Check if we need to flip Y coordinates (Document AI vs PDF coordinate systems)
-                    # Document AI typically uses top-left origin, PDF may use bottom-left
-                    y_coord = pdf_height - y - height  # Flip Y coordinate if needed
-                    
-                    # Calculate scale factors based on actual PDF page dimensions
-                    scale_x = img_width / pdf_width
-                    scale_y = img_height / pdf_height
-                    
-                    # Use the smaller scale to maintain aspect ratio and ensure image fits
-                    scale_factor = min(scale_x, scale_y)
-                    
-                    logger.info(f"PDF page dimensions: {pdf_width}x{pdf_height}, Image dimensions: {img_width}x{img_height}")
-                    logger.info(f"Scale factors: x={scale_x:.3f}, y={scale_y:.3f}, using={scale_factor:.3f}")
-                    logger.info(f"Original coordinates: x={x}, y={y}, width={width}, height={height}")
-                    logger.info(f"Adjusted Y coordinate: {y_coord}")
-                else:
-                    # Fallback to standard A4 dimensions
-                    scale_factor = min(img_width / 595.0, img_height / 842.0)
-                    y_coord = 842.0 - y - height  # A4 height is 842 points
-                    logger.warning(f"Page {page_number} not found, using fallback scale factor: {scale_factor}")
-            except Exception as e:
-                # Fallback to standard A4 dimensions
-                scale_factor = min(img_width / 595.0, img_height / 842.0)
-                y_coord = 842.0 - y - height  # A4 height is 842 points
-                logger.warning(f"Could not get PDF page dimensions, using fallback scale factor: {scale_factor}")
+            logger.info(f"Normalized bounding box: x={x_norm:.6f}, y={y_norm:.6f}, width={width_norm:.6f}, height={height_norm:.6f}")
+            logger.info(f"Page image dimensions: {img_width}x{img_height}")
             
-            # Convert coordinates using the calculated scale factor
-            left = int(x * scale_factor)
-            upper = int(y_coord * scale_factor)
-            right = int((x + width) * scale_factor)
-            lower = int((y_coord + height) * scale_factor)
+            # Convert normalized coordinates (0-1) to pixel coordinates
+            # crop method needs (x1, y1, x2, y2) where (x1, y1) is top-left and (x2, y2) is bottom-right
+            x1 = int(x_norm * img_width)
+            y1 = int(y_norm * img_height)
+            x2 = int((x_norm + width_norm) * img_width)
+            y2 = int((y_norm + height_norm) * img_height)
+            
+            logger.info(f"Pixel coordinates: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
+            
+            # Ensure coordinates are within image bounds
+            x1 = max(0, x1)
+            y1 = max(0, y1)
+            x2 = min(img_width, x2)
+            y2 = min(img_height, y2)
+            
+            logger.info(f"Bounded coordinates: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
             
             # Add adaptive buffer around the crop area based on content size and entity type
-            # Different buffer strategies for different entity types
-            content_size = width * height
+            # Calculate buffer based on normalized content size
+            content_size_norm = width_norm * height_norm
             
-            # Entity-specific buffer strategies
+            # Entity-specific buffer strategies (in pixels)
             if field_type in ['drawing_title', 'drawing_number', 'date']:
                 # These are usually small, precise elements - minimal buffer
-                buffer = 5
+                buffer_pixels = 5
             elif field_type in ['design_criteria']:
                 # Design criteria can be longer text - moderate buffer
-                buffer = 10
-            elif content_size < 1000:  # Small content
-                buffer = 15
-            elif content_size < 10000:  # Medium content
-                buffer = 12
+                buffer_pixels = 10
+            elif content_size_norm < 0.001:  # Very small content
+                buffer_pixels = 15
+            elif content_size_norm < 0.01:  # Small content
+                buffer_pixels = 12
             else:  # Large content
-                buffer = 8
+                buffer_pixels = 8
+            
+            logger.info(f"Content size (normalized): {content_size_norm:.6f}, Buffer: {buffer_pixels} pixels")
             
             # Apply buffer with bounds checking
-            left = max(0, left - buffer)
-            upper = max(0, upper - buffer)
-            right = min(page_image.width, right + buffer)
-            lower = min(page_image.height, lower + buffer)
+            x1 = max(0, x1 - buffer_pixels)
+            y1 = max(0, y1 - buffer_pixels)
+            x2 = min(img_width, x2 + buffer_pixels)
+            y2 = min(img_height, y2 + buffer_pixels)
+            
+            logger.info(f"Final crop coordinates with buffer: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
             
             # Ensure valid crop dimensions
-            if right <= left or lower <= upper:
-                logger.warning(f"Invalid crop dimensions for {field_type}: {left}, {upper}, {right}, {lower}")
-                logger.warning(f"Original bounding box: x={x}, y={y}, width={width}, height={height}")
-                logger.warning(f"Page image size: {page_image.size}, scale_factor: {scale_factor}")
+            if x2 <= x1 or y2 <= y1:
+                logger.warning(f"Invalid crop dimensions for {field_type}: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
+                logger.warning(f"Normalized bounding box: x={x_norm:.6f}, y={y_norm:.6f}, width={width_norm:.6f}, height={height_norm:.6f}")
+                logger.warning(f"Page image size: {page_image.size}")
                 return None
             
             # Log successful crop dimensions
-            logger.info(f"Successfully calculated crop dimensions for {field_type}: {left}, {upper}, {right}, {lower}")
-            logger.info(f"Original bounding box: x={x}, y={y}, width={width}, height={height}")
-            logger.info(f"Page image size: {page_image.size}, scale_factor: {scale_factor}")
+            logger.info(f"Successfully calculated crop dimensions for {field_type}: x1={x1}, y1={y1}, x2={x2}, y2={y2}")
+            logger.info(f"Normalized bounding box: x={x_norm:.6f}, y={y_norm:.6f}, width={width_norm:.6f}, height={height_norm:.6f}")
+            logger.info(f"Page image size: {page_image.size}")
             
             # Crop the image
-            cropped_image = page_image.crop((left, upper, right, lower))
+            cropped_image = page_image.crop((x1, y1, x2, y2))
             
             # Enhance image quality
             # Increase sharpness slightly

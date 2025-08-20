@@ -402,7 +402,12 @@ class EngineeringPDFReportGenerator:
         if not images or not image_base_path:
             return
         
-        # Try to find matching image by entity type with improved matching
+        # Debug: Log available images for this entity
+        logger.info(f"Looking for image for entity '{entity_type}'")
+        logger.info(f"Available images: {[img.get('image_type', 'unknown') for img in images]}")
+        logger.info(f"Available file paths: {[img.get('file_path', 'unknown') for img in images]}")
+        
+        # Try to find matching image by entity type with precise matching
         matching_images = []
         
         for image in images:
@@ -413,20 +418,27 @@ class EngineeringPDFReportGenerator:
             # Priority 1: Exact match by image_type
             if image_type == f"entity_{entity_type.lower()}":
                 matching_images.append((image, 1))
-            # Priority 2: Match by entity type in file_path (handles variations)
-            elif entity_type.lower().replace('_', '') in file_path.replace('_', ''):
+            # Priority 2: Exact match by filename (most reliable)
+            elif os.path.basename(file_path) == f"entity_{entity_type.lower().replace('_', '')}_{image.get('image_id', '').split('_')[-1]}.png":
                 matching_images.append((image, 2))
-            # Priority 3: Match by key words in entity type (more specific matching)
-            elif all(word in file_path for word in entity_type.lower().split('_')):
+            # Priority 3: Match by entity type in file_path (handles variations)
+            elif entity_type.lower().replace('_', '') in file_path.replace('_', ''):
                 matching_images.append((image, 3))
-            # Priority 4: Match by entity type in description
-            elif entity_type.lower() in description:
+            # Priority 4: Match by key words in entity type (more specific matching)
+            elif all(word in file_path for word in entity_type.lower().split('_')):
                 matching_images.append((image, 4))
+            # Priority 5: Match by entity type in description
+            elif entity_type.lower() in description:
+                matching_images.append((image, 5))
         
         # Sort by priority and take the best match
         if matching_images:
             matching_images.sort(key=lambda x: x[1])  # Sort by priority (lower is better)
             best_match = matching_images[0][0]  # Get the image from the best match
+            
+            # Log the matching process for debugging
+            logger.info(f"Entity '{entity_type}' matched with image: {best_match.get('image_type', 'unknown')} (Priority {matching_images[0][1]})")
+            logger.info(f"Matched image file: {best_match.get('file_path', 'unknown')}")
             
             # Use the best matching image
             file_path = best_match.get('file_path')
